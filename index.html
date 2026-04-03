@@ -1,0 +1,1178 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>RWS Severe Weather Prediction</title>
+  <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;600;700&family=Barlow+Condensed:wght@400;600;700&family=Source+Sans+3:wght@400;600&display=swap" rel="stylesheet"/>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --red:#cc0000; --red-dark:#990000; --blue:#1a3a6e; --blue-mid:#1e4fa0;
+      --sky:#5b9bd5; --sky-light:#a8cce8; --white:#ffffff; --off-white:#f0f4fa;
+      --text-dark:#111; --text-body:#222; --gold:#f5c518;
+    }
+    [data-theme="dark"] {
+      --off-white:#12181f; --white:#1e2530; --text-body:#d0dce8; --text-dark:#eef2f8;
+      --blue:#0f2040; --blue-mid:#163368;
+    }
+    html { scroll-behavior:smooth; }
+    body { font-family:'Source Sans 3',sans-serif; background:var(--off-white); color:var(--text-body); min-height:100vh; transition:background 0.3s,color 0.3s; }
+
+    /* ── BANNER ── */
+    #site-banner { display:none; width:100%; padding:10px 20px; text-align:center; font-family:'Oswald',sans-serif; font-size:1rem; font-weight:600; letter-spacing:0.06em; text-transform:uppercase; z-index:50; align-items:center; justify-content:center; gap:12px; }
+    #site-banner.show { display:flex; }
+    .banner-dismiss { background:none; border:none; color:inherit; opacity:0.6; cursor:pointer; font-size:1.1rem; }
+    .banner-dismiss:hover { opacity:1; }
+
+    /* ── TICKER ── */
+    #alert-ticker { display:none; background:#cc0000; color:white; overflow:hidden; height:30px; }
+    #alert-ticker.has-alerts { display:flex; align-items:center; }
+    .ticker-label { font-family:'Oswald',sans-serif; font-size:0.75rem; font-weight:700; text-transform:uppercase; letter-spacing:0.08em; background:rgba(0,0,0,0.3); padding:0 12px; height:100%; display:flex; align-items:center; white-space:nowrap; flex-shrink:0; gap:5px; }
+    .ticker-track { flex:1; overflow:hidden; position:relative; height:100%; }
+    .ticker-inner { display:flex; align-items:center; height:100%; white-space:nowrap; animation:tickerScroll 40s linear infinite; }
+    .ticker-inner:hover { animation-play-state:paused; }
+    @keyframes tickerScroll { 0%{transform:translateX(100%)} 100%{transform:translateX(-100%)} }
+    .ticker-item { display:inline-flex; align-items:center; gap:8px; padding:0 20px; font-family:'Barlow Condensed',sans-serif; font-size:0.85rem; letter-spacing:0.04em; }
+    .ticker-item .ti-type { font-family:'Oswald',sans-serif; font-size:0.7rem; font-weight:700; background:rgba(255,255,255,0.2); padding:1px 6px; border-radius:3px; text-transform:uppercase; }
+
+    /* ── HEADER ── */
+    .header { background:linear-gradient(135deg,var(--blue) 0%,#1a3060 60%,#0e1828 100%); padding:14px 20px; border-bottom:4px solid var(--red); position:relative; overflow:hidden; }
+    .header::before { content:''; position:absolute; inset:0; background:url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='%23ffffff' fill-opacity='0.02'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/svg%3E"); }
+    .header-inner { max-width:1200px; margin:0 auto; display:flex; align-items:center; justify-content:space-between; gap:16px; position:relative; z-index:2; flex-wrap:wrap; }
+    .header-brand { display:flex; align-items:center; gap:14px; }
+    .header-logo { width:68px; height:68px; border-radius:50%; object-fit:cover; border:3px solid rgba(255,255,255,0.2); box-shadow:0 4px 16px rgba(0,0,0,0.5); flex-shrink:0; }
+    .header-titles h1 { font-family:'Oswald',sans-serif; font-size:clamp(1.3rem,3vw,2rem); font-weight:700; color:var(--red); text-transform:uppercase; line-height:1; text-shadow:2px 2px 0 rgba(0,0,0,0.4); }
+    .header-titles h2 { font-family:'Oswald',sans-serif; font-size:clamp(0.65rem,1.5vw,0.9rem); font-weight:400; color:rgba(255,255,255,0.5); text-transform:uppercase; letter-spacing:0.16em; margin-top:3px; }
+    .header-right { display:flex; align-items:center; gap:14px; }
+    .header-clocks { display:flex; gap:14px; align-items:center; }
+    .hclock-block { text-align:center; }
+    .hclock-time { font-family:'Oswald',sans-serif; font-size:1.05rem; font-weight:600; color:white; letter-spacing:0.05em; line-height:1; }
+    .hclock-label { font-family:'Barlow Condensed',sans-serif; font-size:0.58rem; color:rgba(255,255,255,0.4); text-transform:uppercase; letter-spacing:0.12em; }
+    .hclock-sep { width:1px; height:32px; background:rgba(255,255,255,0.15); }
+    .header-nav { display:flex; gap:6px; flex-wrap:wrap; }
+    .header-nav a { font-family:'Oswald',sans-serif; font-size:0.75rem; font-weight:600; text-transform:uppercase; letter-spacing:0.05em; color:rgba(255,255,255,0.55); text-decoration:none; padding:5px 10px; border-radius:4px; border:1px solid rgba(255,255,255,0.1); transition:all 0.15s; white-space:nowrap; }
+    .header-nav a:hover { color:white; background:rgba(255,255,255,0.1); }
+    .header-nav a.active-link { color:white; background:var(--red); border-color:var(--red); }
+
+    /* ── DAY SELECTOR ── */
+    .day-selector { background:var(--blue); padding:8px 20px; border-bottom:2px solid rgba(255,255,255,0.07); }
+    .day-selector-inner { max-width:1200px; margin:0 auto; display:flex; align-items:center; gap:14px; flex-wrap:wrap; }
+    .day-selector-label { font-family:'Oswald',sans-serif; font-size:0.68rem; font-weight:600; text-transform:uppercase; letter-spacing:0.1em; color:rgba(255,255,255,0.4); }
+    .day-btns { display:flex; gap:4px; }
+    .day-btn { background:rgba(255,255,255,0.07); border:1px solid rgba(255,255,255,0.1); border-radius:5px; padding:5px 12px; color:rgba(255,255,255,0.5); font-family:'Oswald',sans-serif; font-size:0.75rem; font-weight:600; text-transform:uppercase; letter-spacing:0.05em; cursor:pointer; transition:all 0.15s; }
+    .day-btn:hover { background:rgba(255,255,255,0.14); color:white; }
+    .day-btn.active { background:var(--red); border-color:var(--red); color:white; }
+    .day-issued-label { font-family:'Barlow Condensed',sans-serif; font-size:0.65rem; color:rgba(255,255,255,0.3); text-transform:uppercase; letter-spacing:0.1em; margin-left:auto; }
+
+    /* ── MAIN GRID ── */
+    .main { max-width:1200px; margin:0 auto; padding:16px; display:grid; grid-template-columns:1fr 300px; gap:16px; }
+    @media(max-width:900px){ .main{grid-template-columns:1fr;} }
+
+    /* ── OUTLOOK IMAGE CARD ── */
+    .outlook-card { background:var(--white); box-shadow:0 2px 12px rgba(0,0,0,0.12); overflow:hidden; }
+    [data-theme="dark"] .outlook-card { box-shadow:0 2px 12px rgba(0,0,0,0.4); }
+    .outlook-card-header { background:var(--blue); padding:10px 18px; display:flex; align-items:center; justify-content:space-between; gap:10px; }
+    .outlook-card-title { font-family:'Oswald',sans-serif; font-size:1rem; font-weight:600; color:white; text-transform:uppercase; letter-spacing:0.05em; }
+    .outlook-card-meta { font-family:'Barlow Condensed',sans-serif; font-size:0.62rem; color:rgba(255,255,255,0.4); text-transform:uppercase; letter-spacing:0.1em; }
+    .outlook-img-wrap { position:relative; width:100%; background:#0a1020; min-height:380px; display:flex; align-items:center; justify-content:center; overflow:hidden; }
+    [data-theme="dark"] .outlook-img-wrap { background:#080e1a; }
+    #outlook-graphic { max-width:100%; max-height:560px; width:100%; object-fit:contain; display:block; }
+    .outlook-empty { display:flex; flex-direction:column; align-items:center; gap:10px; padding:60px 20px; color:rgba(255,255,255,0.3); font-family:'Oswald',sans-serif; font-size:0.9rem; text-transform:uppercase; letter-spacing:0.1em; }
+    .outlook-empty .oe-icon { font-size:3rem; opacity:0.3; }
+    .outlook-caption { background:rgba(0,0,0,0.65); padding:6px 12px; font-family:'Barlow Condensed',sans-serif; font-size:0.75rem; color:rgba(255,255,255,0.7); text-align:center; letter-spacing:0.04em; min-height:28px; }
+    .risk-legend { background:var(--white); border-top:1px solid #dde4ef; padding:9px 18px; display:flex; align-items:center; gap:6px; flex-wrap:wrap; }
+    [data-theme="dark"] .risk-legend { background:var(--white); border-top-color:#2a3547; }
+    .risk-legend-title { font-family:'Oswald',sans-serif; font-size:0.62rem; font-weight:600; text-transform:uppercase; letter-spacing:0.1em; color:#888; margin-right:6px; }
+    .risk-sw { display:flex; align-items:center; gap:4px; font-family:'Barlow Condensed',sans-serif; font-size:0.68rem; font-weight:600; text-transform:uppercase; letter-spacing:0.05em; color:var(--text-body); }
+    .risk-sw .rsw { width:12px; height:12px; border-radius:2px; flex-shrink:0; }
+    .risk-updated { font-family:'Barlow Condensed',sans-serif; font-size:0.6rem; color:#aaa; margin-left:auto; letter-spacing:0.06em; text-transform:uppercase; }
+
+    /* ── SIDEBAR ── */
+    .sidebar { display:flex; flex-direction:column; gap:14px; }
+    .sidebar-card { background:var(--white); box-shadow:0 2px 8px rgba(0,0,0,0.1); overflow:hidden; }
+    [data-theme="dark"] .sidebar-card { box-shadow:0 2px 8px rgba(0,0,0,0.3); }
+    .sc-header { background:var(--blue); padding:8px 14px; display:flex; align-items:center; justify-content:space-between; }
+    .sc-title { font-family:'Oswald',sans-serif; font-size:0.82rem; font-weight:600; color:white; text-transform:uppercase; letter-spacing:0.05em; }
+    .sc-count { font-family:'Oswald',sans-serif; font-size:0.72rem; color:rgba(255,255,255,0.5); }
+    .sc-body { padding:8px; max-height:220px; overflow-y:auto; }
+    .alert-item { padding:5px 8px; border-radius:4px; margin-bottom:4px; cursor:pointer; border-left:3px solid #555; background:rgba(0,0,0,0.03); }
+    [data-theme="dark"] .alert-item { background:rgba(255,255,255,0.04); }
+    .alert-item .ai-type { font-family:'Oswald',sans-serif; font-size:0.7rem; font-weight:700; text-transform:uppercase; }
+    .alert-item .ai-area { font-size:11px; color:#666; font-family:'Barlow Condensed',sans-serif; margin-top:1px; }
+    [data-theme="dark"] .alert-item .ai-area { color:#778; }
+    .no-msg { font-family:'Barlow Condensed',sans-serif; font-size:0.72rem; color:#aaa; text-transform:uppercase; letter-spacing:0.06em; text-align:center; padding:10px 0; }
+
+    /* City risk list */
+    .city-risk-list { padding:6px 8px; max-height:260px; overflow-y:auto; }
+    .city-risk-row { display:flex; align-items:center; gap:6px; padding:4px 6px; border-radius:3px; transition:background 0.15s; }
+    .city-risk-row:hover { background:rgba(0,0,0,0.04); }
+    [data-theme="dark"] .city-risk-row:hover { background:rgba(255,255,255,0.04); }
+    .crd-dot { width:9px; height:9px; border-radius:50%; flex-shrink:0; }
+    .crd-name { font-family:'Barlow Condensed',sans-serif; font-size:0.78rem; color:var(--text-body); flex:1; }
+    .crd-badge { font-family:'Oswald',sans-serif; font-size:0.58rem; font-weight:700; padding:1px 5px; border-radius:2px; text-transform:uppercase; }
+
+    /* ── CURRENT CONDITIONS ── */
+    .conditions-section { max-width:1200px; margin:0 auto; padding:0 16px; }
+    .cond-card-wrap { background:var(--white); box-shadow:0 2px 12px rgba(0,0,0,0.1); overflow:hidden; margin-bottom:16px; }
+    [data-theme="dark"] .cond-card-wrap { box-shadow:0 2px 12px rgba(0,0,0,0.3); }
+    .cond-header { background:var(--blue); padding:9px 20px; display:flex; align-items:center; justify-content:space-between; }
+    .cond-header-title { font-family:'Oswald',sans-serif; font-size:1rem; font-weight:600; color:white; text-transform:uppercase; letter-spacing:0.05em; }
+    .cond-header-right { font-family:'Barlow Condensed',sans-serif; font-size:0.65rem; color:rgba(255,255,255,0.4); text-transform:uppercase; letter-spacing:0.08em; }
+    .cond-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(165px,1fr)); gap:0; }
+    .cond-item { padding:12px 15px; border-right:1px solid #dde4ef; border-bottom:1px solid #dde4ef; transition:background 0.15s; }
+    .cond-item:hover { background:#f6f9ff; }
+    [data-theme="dark"] .cond-item { border-color:#2a3547; }
+    [data-theme="dark"] .cond-item:hover { background:#252f3d; }
+    .cond-station { font-family:'Oswald',sans-serif; font-size:0.68rem; font-weight:700; color:var(--blue); text-transform:uppercase; letter-spacing:0.1em; }
+    [data-theme="dark"] .cond-station { color:var(--sky); }
+    .cond-temp { font-family:'Oswald',sans-serif; font-size:2rem; font-weight:700; color:var(--text-dark); line-height:1; margin:3px 0 2px; }
+    .cond-temp .cond-unit { font-size:0.9rem; font-weight:400; color:#888; }
+    .cond-wx { font-family:'Barlow Condensed',sans-serif; font-size:0.78rem; color:#555; text-transform:uppercase; letter-spacing:0.05em; }
+    [data-theme="dark"] .cond-wx { color:#a0b4c8; }
+    .cond-meta { font-family:'Barlow Condensed',sans-serif; font-size:0.65rem; color:#999; margin-top:3px; line-height:1.5; }
+    [data-theme="dark"] .cond-meta { color:#556677; }
+    .cond-loading { opacity:0.4; font-style:italic; }
+
+    /* ── DISCUSSION ── */
+    .disc-section { max-width:1200px; margin:0 auto; padding:0 16px 16px; }
+    .disc-card { background:var(--white); box-shadow:0 2px 8px rgba(0,0,0,0.1); overflow:hidden; }
+    [data-theme="dark"] .disc-card { box-shadow:0 2px 8px rgba(0,0,0,0.3); }
+    .disc-header { background:var(--red); padding:9px 20px; display:flex; align-items:center; justify-content:space-between; }
+    .disc-title { font-family:'Oswald',sans-serif; font-size:1rem; font-weight:600; color:white; text-transform:uppercase; letter-spacing:0.05em; }
+    .disc-meta { font-family:'Barlow Condensed',sans-serif; font-size:0.62rem; color:rgba(255,255,255,0.5); text-transform:uppercase; letter-spacing:0.08em; }
+    .disc-body { padding:18px 20px; }
+    .disc-body p { font-size:14px; line-height:1.65; color:#444; margin-bottom:10px; }
+    [data-theme="dark"] .disc-body p { color:#a0b4c8; }
+    .disc-body p:last-child { margin-bottom:0; }
+    .disc-body p strong { color:var(--blue); font-weight:600; }
+
+    /* ── FOOTER ── */
+    footer { background:var(--blue); margin-top:8px; padding:20px; }
+    .footer-inner { max-width:1200px; margin:0 auto; display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:16px; }
+    .footer-brand { display:flex; align-items:center; gap:12px; }
+    .footer-logo { width:46px; height:46px; border-radius:50%; object-fit:cover; border:2px solid rgba(255,255,255,0.2); }
+    .footer-text .ft-big { font-family:'Oswald',sans-serif; font-size:1.5rem; font-weight:700; color:white; line-height:1; }
+    .footer-text .ft-sub { font-family:'Barlow Condensed',sans-serif; font-size:0.72rem; color:var(--sky-light); text-transform:uppercase; letter-spacing:0.1em; }
+    .footer-offices { }
+    .footer-offices-title { font-family:'Oswald',sans-serif; font-size:0.65rem; font-weight:600; text-transform:uppercase; letter-spacing:0.12em; color:rgba(255,255,255,0.35); margin-bottom:7px; }
+    .footer-offices-links { display:flex; gap:10px; flex-wrap:wrap; }
+    .footer-offices-links a { font-family:'Barlow Condensed',sans-serif; font-size:0.82rem; color:rgba(255,255,255,0.55); text-decoration:none; text-transform:uppercase; letter-spacing:0.06em; transition:color 0.15s; }
+    .footer-offices-links a:hover { color:white; }
+    .footer-ext { display:flex; gap:14px; flex-wrap:wrap; }
+    .footer-ext a { font-family:'Barlow Condensed',sans-serif; font-size:0.8rem; color:rgba(255,255,255,0.4); text-decoration:none; text-transform:uppercase; letter-spacing:0.06em; transition:color 0.15s; }
+    .footer-ext a:hover { color:white; }
+    .footer-bottom { max-width:1200px; margin:10px auto 0; border-top:1px solid rgba(255,255,255,0.08); padding-top:10px; font-family:'Barlow Condensed',sans-serif; font-size:0.68rem; color:rgba(255,255,255,0.3); letter-spacing:0.05em; text-align:center; }
+
+    /* ── FIXED BUTTONS ── */
+    #theme-btn-n { position:fixed; bottom:52px; right:14px; width:30px; height:30px; background:rgba(0,0,0,0.2); border:none; border-radius:6px; cursor:pointer; display:flex; align-items:center; justify-content:center; font-size:14px; opacity:0.3; transition:opacity 0.2s; z-index:900; }
+    #theme-btn-n:hover { opacity:1; background:rgba(0,0,0,0.55); }
+    #admin-btn-n { position:fixed; bottom:14px; right:14px; width:30px; height:30px; background:rgba(0,0,0,0.2); border:none; border-radius:6px; cursor:pointer; display:flex; align-items:center; justify-content:center; font-size:15px; opacity:0.3; transition:opacity 0.2s; z-index:900; }
+    #admin-btn-n:hover { opacity:1; background:rgba(0,0,0,0.55); }
+
+    /* ── ADMIN MODAL ── */
+    #admin-overlay-n { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.65); z-index:1000; align-items:center; justify-content:center; padding:16px; }
+    #admin-overlay-n.open { display:flex; }
+    #admin-modal-n { background:#1a1e2e; border-radius:12px; width:100%; max-width:700px; max-height:90vh; overflow-y:auto; box-shadow:0 20px 60px rgba(0,0,0,0.6); color:#e0e6f0; }
+    .amn-header { background:var(--red); padding:13px 20px; border-radius:12px 12px 0 0; display:flex; align-items:center; justify-content:space-between; position:sticky; top:0; z-index:10; }
+    .amn-header h2 { font-family:'Oswald',sans-serif; font-size:1.1rem; font-weight:700; color:white; letter-spacing:0.06em; text-transform:uppercase; }
+    .amn-close { background:none; border:none; color:rgba(255,255,255,0.7); font-size:1.4rem; cursor:pointer; padding:2px 8px; border-radius:4px; }
+    .amn-close:hover { color:white; }
+    .amn-body { padding:20px; }
+    .amn-tabs { display:flex; gap:4px; margin-bottom:18px; flex-wrap:wrap; }
+    .amn-tab { background:#252a3d; border:none; color:#7a8aaa; font-family:'Oswald',sans-serif; font-size:0.75rem; font-weight:600; text-transform:uppercase; letter-spacing:0.06em; padding:6px 12px; border-radius:5px; cursor:pointer; transition:all 0.2s; }
+    .amn-tab.active { background:var(--blue-mid); color:white; }
+    .amn-tab-panel { display:none; }
+    .amn-tab-panel.active { display:block; }
+    .amn-label { font-size:11px; font-weight:600; color:#7a8aaa; text-transform:uppercase; letter-spacing:0.08em; margin-bottom:4px; display:block; }
+    .amn-input { width:100%; background:#252a3d; border:1px solid #3a4060; border-radius:6px; padding:10px 12px; color:#e0e6f0; font-size:15px; font-family:inherit; outline:none; transition:border-color 0.2s; }
+    .amn-input:focus { border-color:var(--sky); }
+    .amn-input-sm { background:#1a1e2e; border:1px solid #3a4060; border-radius:5px; padding:7px 10px; color:#e0e6f0; font-size:14px; font-family:inherit; outline:none; width:100%; }
+    .amn-input-sm:focus { border-color:var(--sky); }
+    .amn-select { background:#1a1e2e; border:1px solid #3a4060; border-radius:5px; padding:7px 10px; color:#e0e6f0; font-size:14px; font-family:inherit; outline:none; width:100%; cursor:pointer; }
+    .amn-textarea { background:#1a1e2e; border:1px solid #3a4060; border-radius:5px; padding:8px 10px; color:#e0e6f0; font-size:13px; font-family:inherit; outline:none; width:100%; resize:vertical; min-height:80px; line-height:1.5; }
+    .amn-textarea:focus { border-color:var(--sky); }
+    .amn-btn { background:var(--red); color:white; border:none; border-radius:6px; padding:9px 18px; font-family:'Oswald',sans-serif; font-size:0.88rem; font-weight:600; letter-spacing:0.06em; text-transform:uppercase; cursor:pointer; transition:background 0.2s; margin-top:10px; }
+    .amn-btn:hover { background:var(--red-dark); }
+    .amn-btn-sec { background:#2e3450; color:#aab; border:1px solid #3a4060; border-radius:6px; padding:8px 14px; font-family:'Oswald',sans-serif; font-size:0.82rem; letter-spacing:0.04em; text-transform:uppercase; cursor:pointer; transition:background 0.2s; margin-top:10px; }
+    .amn-btn-sec:hover { background:#3a4060; color:#e0e6f0; }
+    .amn-section { margin-bottom:22px; }
+    .amn-section-title { font-family:'Oswald',sans-serif; font-size:0.82rem; font-weight:600; color:var(--sky); text-transform:uppercase; letter-spacing:0.1em; margin-bottom:10px; padding-bottom:5px; border-bottom:1px solid #2e3450; }
+    .amn-status { font-size:13px; min-height:18px; margin-top:8px; line-height:1.5; }
+    .amn-status.ok { color:#4caf82; } .amn-status.err { color:#ff6b6b; } .amn-status.loading { color:#f5c518; }
+    .login-err-n { color:#ff6b6b; font-size:13px; margin-top:8px; display:none; }
+
+    /* Office list */
+    .office-list { max-height:180px; overflow-y:auto; margin-top:8px; }
+    .office-item { display:flex; align-items:center; gap:8px; background:#252a3d; border-radius:5px; padding:6px 10px; margin-bottom:5px; }
+    .office-item .oi-name { font-family:'Barlow Condensed',sans-serif; font-size:0.85rem; color:#e0e6f0; flex:1; }
+    .office-item .oi-url { font-size:11px; color:#556677; flex:2; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .office-del-btn { background:none; border:none; color:#556677; cursor:pointer; font-size:14px; padding:0 3px; }
+    .office-del-btn:hover { color:#ff6b6b; }
+
+    /* Image upload area */
+    .img-upload-area { border:2px dashed #3a4060; border-radius:8px; padding:20px; text-align:center; cursor:pointer; transition:border-color 0.2s,background 0.2s; }
+    .img-upload-area:hover { border-color:var(--sky); background:rgba(91,155,213,0.05); }
+    .img-upload-area .iu-icon { font-size:2rem; display:block; margin-bottom:6px; }
+    .img-upload-area .iu-label { font-family:'Oswald',sans-serif; font-size:0.85rem; color:#e0e6f0; text-transform:uppercase; letter-spacing:0.06em; }
+    .img-upload-area .iu-hint { font-size:12px; color:#556677; margin-top:4px; line-height:1.5; }
+    .day-img-slots { display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px; margin-bottom:10px; }
+    .day-img-slot { background:#252a3d; border-radius:6px; padding:8px; text-align:center; }
+    .day-img-slot .dis-label { font-family:'Oswald',sans-serif; font-size:0.65rem; font-weight:600; text-transform:uppercase; letter-spacing:0.08em; color:var(--sky); margin-bottom:5px; display:block; }
+    .day-img-slot img { width:100%; height:50px; object-fit:cover; border-radius:3px; display:none; }
+    .day-img-slot .dis-status { font-size:10px; color:#556677; text-transform:uppercase; letter-spacing:0.06em; }
+    .day-img-slot .dis-clear { background:none; border:none; color:#ff6b6b; cursor:pointer; font-size:10px; font-family:'Barlow Condensed',sans-serif; text-transform:uppercase; letter-spacing:0.06em; margin-top:4px; display:none; }
+
+    /* Banner swatches */
+    .bsw-n { width:26px; height:26px; border-radius:5px; cursor:pointer; border:2px solid transparent; transition:border-color 0.15s,transform 0.15s; flex-shrink:0; }
+    .bsw-n:hover, .bsw-n.sel { border-color:white; transform:scale(1.1); }
+
+    /* Risk city table */
+    .risk-table-n { width:100%; border-collapse:collapse; font-size:12px; }
+    .risk-table-n th { font-family:'Oswald',sans-serif; font-size:0.62rem; text-transform:uppercase; letter-spacing:0.08em; color:rgba(255,255,255,0.55); padding:4px 8px; text-align:left; border-bottom:1px solid rgba(255,255,255,0.08); }
+    .risk-table-n td { padding:4px 8px; border-bottom:1px solid rgba(255,255,255,0.04); color:#aab; font-size:11px; }
+    .risk-table-n tr:last-child td { border-bottom:none; }
+    .rt-del { background:none; border:none; color:#556677; cursor:pointer; font-size:12px; padding:0 2px; }
+    .rt-del:hover { color:#ff6b6b; }
+
+    /* Lock screen */
+    #lock-screen-n { display:none; position:fixed; inset:0; z-index:9999; align-items:center; justify-content:center; background:rgba(8,20,40,0.97); backdrop-filter:blur(16px); -webkit-backdrop-filter:blur(16px); }
+    #lock-screen-n.locked { display:flex; }
+    .lk-content { text-align:center; padding:32px 24px; max-width:360px; width:100%; }
+    .lk-logo { width:96px; height:96px; border-radius:50%; object-fit:cover; border:3px solid rgba(255,255,255,0.2); margin:0 auto 14px; display:block; }
+    .lk-title { font-family:'Oswald',sans-serif; font-size:1.5rem; font-weight:700; color:white; text-transform:uppercase; }
+    .lk-sub { font-family:'Barlow Condensed',sans-serif; font-size:0.75rem; color:rgba(255,255,255,0.4); text-transform:uppercase; letter-spacing:0.12em; margin:4px 0 18px; }
+    .lk-clock { font-family:'Oswald',sans-serif; font-size:2.6rem; font-weight:700; color:white; margin-bottom:2px; }
+    .lk-date { font-family:'Barlow Condensed',sans-serif; font-size:0.85rem; color:rgba(255,255,255,0.45); text-transform:uppercase; letter-spacing:0.1em; margin-bottom:20px; }
+    .lk-row { display:flex; gap:8px; margin-bottom:8px; }
+    .lk-pin { flex:1; background:rgba(255,255,255,0.08); border:1px solid rgba(255,255,255,0.18); border-radius:8px; padding:11px 14px; color:white; font-family:'Oswald',sans-serif; font-size:1.1rem; letter-spacing:0.2em; text-align:center; outline:none; }
+    .lk-pin::placeholder { color:rgba(255,255,255,0.3); letter-spacing:0.1em; }
+    .lk-pin:focus { border-color:var(--sky); }
+    .lk-unlock { background:var(--red); border:none; border-radius:8px; padding:11px 18px; color:white; font-family:'Oswald',sans-serif; font-size:0.9rem; font-weight:600; text-transform:uppercase; letter-spacing:0.06em; cursor:pointer; }
+    .lk-err { color:#ff8888; font-family:'Barlow Condensed',sans-serif; font-size:0.75rem; text-transform:uppercase; letter-spacing:0.08em; min-height:18px; }
+    .gh-note-n { font-size:11px; color:#556677; line-height:1.6; margin-top:8px; }
+    .gh-note-n a { color:var(--sky); }
+
+    @keyframes fadeUp { from{opacity:0;transform:translateY(12px)} to{opacity:1;transform:translateY(0)} }
+    .outlook-card,.sidebar-card,.cond-card-wrap,.disc-card { animation:fadeUp 0.4s ease both; }
+
+    @media(max-width:600px){
+      .day-img-slots { grid-template-columns:1fr; }
+      .cond-grid { grid-template-columns:1fr 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- BANNER -->
+<div id="site-banner-n">
+  <span id="banner-text-n"></span>
+  <button class="banner-dismiss" onclick="document.getElementById('site-banner-n').classList.remove('show')">&#x2715;</button>
+</div>
+
+<!-- TICKER -->
+<div id="alert-ticker" role="marquee" aria-live="polite">
+  <div class="ticker-label"><span>&#x26A0;</span> NWS ALERTS</div>
+  <div class="ticker-track"><div class="ticker-inner" id="ticker-inner-n"></div></div>
+</div>
+
+<!-- HEADER -->
+<header class="header">
+  <div class="header-inner">
+    <div class="header-brand">
+      <img src="spc-logo.png" alt="RWS SPC" class="header-logo" onerror="this.style.display='none'"/>
+      <div class="header-titles">
+        <h1>RWS Severe Weather Prediction</h1>
+        <h2>Regional Weather Service &mdash; National Operations</h2>
+      </div>
+    </div>
+    <div class="header-right">
+      <div class="header-clocks">
+        <div class="hclock-block">
+          <div class="hclock-time" id="n-clock-local">--:--:--</div>
+          <div class="hclock-label">Local</div>
+        </div>
+        <div class="hclock-sep"></div>
+        <div class="hclock-block">
+          <div class="hclock-time" id="n-clock-utc">--:--:-- Z</div>
+          <div class="hclock-label">UTC / Zulu</div>
+        </div>
+      </div>
+      <nav class="header-nav" id="header-office-nav">
+        <a href="index.html">RWS Albany</a>
+        <a href="national.html" class="active-link">Nat. Outlook</a>
+      </nav>
+    </div>
+  </div>
+</header>
+
+<!-- DAY SELECTOR -->
+<div class="day-selector">
+  <div class="day-selector-inner">
+    <span class="day-selector-label">Outlook Day</span>
+    <div class="day-btns">
+      <button class="day-btn active" data-outday="1">Day 1</button>
+      <button class="day-btn" data-outday="2">Day 2</button>
+      <button class="day-btn" data-outday="3">Day 3</button>
+    </div>
+    <span class="day-issued-label" id="n-issued-label">—</span>
+  </div>
+</div>
+
+<!-- MAIN -->
+<div class="main">
+  <!-- LEFT: OUTLOOK IMAGE -->
+  <div>
+    <div class="outlook-card">
+      <div class="outlook-card-header">
+        <div class="outlook-card-title" id="outlook-card-title">Day 1 Convective Outlook</div>
+        <div class="outlook-card-meta" id="outlook-card-meta">Upload graphic from admin panel</div>
+      </div>
+      <div class="outlook-img-wrap" id="outlook-img-wrap">
+        <img id="outlook-graphic" src="" alt="Outlook Graphic" style="display:none;"/>
+        <div class="outlook-empty" id="outlook-empty">
+          <span class="oe-icon">&#x1F5FA;</span>
+          No outlook graphic uploaded yet
+        </div>
+      </div>
+      <div class="outlook-caption" id="outlook-caption"></div>
+      <div class="risk-legend">
+        <span class="risk-legend-title">Risk:</span>
+        <div class="risk-sw"><div class="rsw" style="background:#c8d896"></div>Gen. Thunder</div>
+        <div class="risk-sw"><div class="rsw" style="background:#7ec850"></div>Marginal</div>
+        <div class="risk-sw"><div class="rsw" style="background:#f0e050"></div>Slight</div>
+        <div class="risk-sw"><div class="rsw" style="background:#e08028"></div>Enhanced</div>
+        <div class="risk-sw"><div class="rsw" style="background:#e82010"></div>Moderate</div>
+        <div class="risk-sw"><div class="rsw" style="background:#ff00ff"></div>High</div>
+        <span class="risk-updated" id="risk-updated-n"></span>
+      </div>
+    </div>
+  </div>
+
+  <!-- SIDEBAR -->
+  <div class="sidebar">
+
+    <!-- Active Warnings -->
+    <div class="sidebar-card">
+      <div class="sc-header">
+        <div class="sc-title">&#x26A1; Active Warnings</div>
+        <div class="sc-count" id="warn-count-n">—</div>
+      </div>
+      <div class="sc-body" id="active-warn-list-n">
+        <div class="no-msg">Fetching…</div>
+      </div>
+    </div>
+
+    <!-- Cities Risk -->
+    <div class="sidebar-card">
+      <div class="sc-header">
+        <div class="sc-title">&#x1F3D9; City Risk Summary</div>
+        <div class="sc-count">30 cities</div>
+      </div>
+      <div class="city-risk-list" id="city-risk-list-n"></div>
+    </div>
+
+  </div>
+</div>
+
+<!-- CURRENT CONDITIONS -->
+<div class="conditions-section" style="margin-top:16px;">
+  <div class="cond-card-wrap">
+    <div class="cond-header">
+      <div class="cond-header-title">&#x1F321; National Current Conditions</div>
+      <div class="cond-header-right">Auto-updates every 10 min &nbsp;&bull;&nbsp; Source: NWS ASOS</div>
+    </div>
+    <div class="cond-grid" id="nat-cond-grid"></div>
+  </div>
+</div>
+
+<!-- DISCUSSION -->
+<div class="disc-section">
+  <div class="disc-card">
+    <div class="disc-header">
+      <div class="disc-title">Severe Weather Discussion</div>
+      <div class="disc-meta" id="n-disc-updated">—</div>
+    </div>
+    <div class="disc-body" id="nat-disc-body">
+      <p>No significant severe weather expected across the United States today.</p>
+    </div>
+  </div>
+</div>
+
+<!-- FOOTER -->
+<footer>
+  <div class="footer-inner">
+    <div class="footer-brand">
+      <img src="spc-logo.png" alt="RWS" class="footer-logo" onerror="this.style.display='none'"/>
+      <div class="footer-text">
+        <div class="ft-big">RWS</div>
+        <div class="ft-sub">Severe Weather Prediction</div>
+      </div>
+    </div>
+    <div class="footer-offices">
+      <div class="footer-offices-title">&#x1F4CD; View All RWS Offices</div>
+      <div class="footer-offices-links" id="footer-office-links">
+        <!-- Populated by JS -->
+      </div>
+    </div>
+    <div class="footer-ext">
+      <a href="https://www.spc.noaa.gov" target="_blank" rel="noopener">NOAA SPC</a>
+      <a href="https://www.weather.gov" target="_blank" rel="noopener">NWS</a>
+      <a href="https://discord.gg/jJhcxF4yGg" target="_blank" rel="noopener">Discord</a>
+    </div>
+  </div>
+  <div class="footer-bottom">
+    RWS Severe Weather Prediction &nbsp;&middot;&nbsp; Official NWS/NOAA partner product &nbsp;&middot;&nbsp; For informational use
+  </div>
+</footer>
+
+<!-- LOCK SCREEN -->
+<div id="lock-screen-n">
+  <div class="lk-content">
+    <img src="spc-logo.png" alt="RWS" class="lk-logo" onerror="this.style.display='none'"/>
+    <div class="lk-title">RWS Severe Prediction</div>
+    <div class="lk-sub">National Operations Center</div>
+    <div class="lk-clock" id="lk-clock-n">--:--:--</div>
+    <div class="lk-date" id="lk-date-n">---</div>
+    <div class="lk-row">
+      <input class="lk-pin" type="password" id="lk-pin-n" placeholder="Enter PIN" maxlength="12" autocomplete="off"/>
+      <button class="lk-unlock" onclick="tryUnlockN()">&#x1F513;</button>
+    </div>
+    <div class="lk-err" id="lk-err-n"></div>
+  </div>
+</div>
+
+<!-- THEME + ADMIN BUTTONS -->
+<button id="theme-btn-n" title="Switch Theme">&#x1F3A8;</button>
+<button id="admin-btn-n" title="Forecaster Login">&#x1F527;</button>
+
+<!-- ADMIN MODAL -->
+<div id="admin-overlay-n">
+  <div id="admin-modal-n">
+    <div class="amn-header">
+      <h2>&#x1F527; Forecaster Panel — National</h2>
+      <button class="amn-close" id="amn-close">&#x2715;</button>
+    </div>
+    <div class="amn-body">
+
+      <!-- LOGIN -->
+      <div id="login-view-n">
+        <h3 style="font-family:'Oswald',sans-serif;font-size:1rem;color:#8899bb;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:14px;">Forecaster Login</h3>
+        <label class="amn-label" for="pw-n">Password</label>
+        <input class="amn-input" type="password" id="pw-n" placeholder="Enter password" autocomplete="current-password"/>
+        <div class="login-err-n" id="login-err-n">Incorrect password.</div>
+        <br><button class="amn-btn" id="login-btn-n" style="margin-top:12px;">Log In</button>
+      </div>
+
+      <!-- EDITOR -->
+      <div id="editor-view-n" style="display:none;">
+        <div class="amn-tabs">
+          <button class="amn-tab active" data-tabn="outlook">Outlook</button>
+          <button class="amn-tab" data-tabn="cities">Cities</button>
+          <button class="amn-tab" data-tabn="offices">Offices</button>
+          <button class="amn-tab" data-tabn="banner">Banner</button>
+          <button class="amn-tab" data-tabn="discussion">Discussion</button>
+          <button class="amn-tab" data-tabn="github">GitHub</button>
+          <button class="amn-tab" data-tabn="settings">Settings</button>
+        </div>
+
+        <!-- OUTLOOK TAB -->
+        <div class="amn-tab-panel active" id="tabn-outlook">
+          <div class="amn-section">
+            <div class="amn-section-title">Outlook Graphics (GFC / PNG / GIF)</div>
+            <p style="font-size:13px;color:#aab;margin-bottom:12px;line-height:1.6;">
+              Upload outlook graphics exported from <strong style="color:#e0e6f0;">Graphical Forecast Creator</strong> or any
+              PNG/GIF. Each day slot is independent. Supported: PNG, GIF, JPG, WebP.
+            </p>
+            <div class="day-img-slots" id="day-img-slots">
+              <!-- Built by JS -->
+            </div>
+            <label class="img-upload-area" for="gfc-upload" id="gfc-drop-zone">
+              <span class="iu-icon">&#x1F4E4;</span>
+              <div class="iu-label">Click or drop graphic here</div>
+              <div class="iu-hint">PNG / GIF / JPG from Graphical Forecast Creator or any outlook tool<br>Will upload to currently selected day slot</div>
+              <input type="file" id="gfc-upload" accept="image/*,.gif" style="display:none;"/>
+            </label>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px;">
+              <div>
+                <label class="amn-label">Selected Day</label>
+                <select class="amn-select" id="gfc-day-select">
+                  <option value="1">Day 1</option>
+                  <option value="2">Day 2</option>
+                  <option value="3">Day 3</option>
+                </select>
+              </div>
+              <div>
+                <label class="amn-label">Caption (optional)</label>
+                <input class="amn-input-sm" id="gfc-caption" placeholder="e.g. Day 1 Categorical — Valid 12Z"/>
+              </div>
+            </div>
+            <div class="amn-status" id="gfc-status" style="margin-top:8px;"></div>
+          </div>
+        </div>
+
+        <!-- CITIES TAB -->
+        <div class="amn-tab-panel" id="tabn-cities">
+          <div class="amn-section">
+            <div class="amn-section-title">City Risk Overrides</div>
+            <p style="font-size:13px;color:#aab;margin-bottom:12px;line-height:1.5;">Manually set a risk level for any city. Overrides all automatic detection.</p>
+            <div style="display:grid;grid-template-columns:1fr 1fr auto;gap:8px;align-items:end;margin-bottom:10px;">
+              <div>
+                <label class="amn-label">City</label>
+                <select class="amn-select" id="city-sel-n"></select>
+              </div>
+              <div>
+                <label class="amn-label">Risk Level</label>
+                <select class="amn-select" id="city-risk-n">
+                  <option value="">None</option>
+                  <option value="TSTM">TSTM</option>
+                  <option value="MRGL">Marginal</option>
+                  <option value="SLGT">Slight</option>
+                  <option value="ENH">Enhanced</option>
+                  <option value="MDT">Moderate</option>
+                  <option value="HIGH">High</option>
+                </select>
+              </div>
+              <button class="amn-btn" id="set-city-risk-n" style="margin-top:0;padding:8px 14px;">Set</button>
+            </div>
+            <button class="amn-btn-sec" id="clear-city-n" style="margin-top:0;">Clear All Overrides</button>
+            <div style="margin-top:14px;">
+              <div class="amn-section-title">Current Overrides</div>
+              <div id="city-override-table"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- OFFICES TAB -->
+        <div class="amn-tab-panel" id="tabn-offices">
+          <div class="amn-section">
+            <div class="amn-section-title">RWS Office Links</div>
+            <p style="font-size:13px;color:#aab;margin-bottom:12px;line-height:1.6;">Add links to RWS office sites. These appear in the footer "View All RWS Offices" section and the header nav.</p>
+            <div style="display:grid;grid-template-columns:1fr 1fr auto;gap:8px;align-items:end;margin-bottom:6px;">
+              <div>
+                <label class="amn-label">Office Name</label>
+                <input class="amn-input-sm" id="office-name" placeholder="e.g. RWS Albany"/>
+              </div>
+              <div>
+                <label class="amn-label">URL</label>
+                <input class="amn-input-sm" id="office-url" placeholder="https://…"/>
+              </div>
+              <button class="amn-btn" id="add-office-btn" style="margin-top:0;padding:8px 14px;">Add</button>
+            </div>
+            <div class="office-list" id="office-list"></div>
+            <div class="amn-status" id="office-status"></div>
+          </div>
+        </div>
+
+        <!-- BANNER TAB -->
+        <div class="amn-tab-panel" id="tabn-banner">
+          <div class="amn-section">
+            <div class="amn-section-title">Site Banner</div>
+            <label class="amn-label" for="banner-msg-n">Message</label>
+            <input class="amn-input-sm" id="banner-msg-n" placeholder="e.g. HIGH RISK DAY — Tornado Emergency Possible" style="margin-bottom:10px;"/>
+            <label class="amn-label">Color</label>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;margin:8px 0 12px;">
+              <div class="bsw-n sel" data-col="#cc0000" style="background:#cc0000;"></div>
+              <div class="bsw-n" data-col="#e67e00" style="background:#e67e00;"></div>
+              <div class="bsw-n" data-col="#c8a000" style="background:#c8a000;"></div>
+              <div class="bsw-n" data-col="#6a1a9a" style="background:#6a1a9a;"></div>
+              <div class="bsw-n" data-col="#1a3a6e" style="background:#1a3a6e;"></div>
+              <div class="bsw-n" data-col="#1a6030" style="background:#1a6030;"></div>
+            </div>
+            <label style="display:flex;align-items:center;gap:8px;font-size:13px;color:#aab;cursor:pointer;margin-bottom:12px;">
+              <input type="checkbox" id="banner-en-n" style="accent-color:var(--red);"/> Enable Banner
+            </label>
+            <button class="amn-btn" id="save-banner-n" style="margin-top:0;">Apply Banner</button>
+            <div class="amn-status" id="banner-status-n"></div>
+          </div>
+        </div>
+
+        <!-- DISCUSSION TAB -->
+        <div class="amn-tab-panel" id="tabn-discussion">
+          <div class="amn-section">
+            <div class="amn-section-title">Severe Weather Discussion</div>
+            <label class="amn-label">Discussion Text (blank lines = new paragraph)</label>
+            <textarea class="amn-textarea" id="nat-disc-input" rows="10" placeholder="Day 1: ...&#10;&#10;Day 2: ..."></textarea>
+            <button class="amn-btn" id="save-disc-n" style="margin-top:10px;">Save &amp; Preview</button>
+            <div class="amn-status" id="disc-status-n"></div>
+          </div>
+        </div>
+
+        <!-- GITHUB TAB -->
+        <div class="amn-tab-panel" id="tabn-github">
+          <div class="amn-section">
+            <div class="amn-section-title">Push to GitHub</div>
+            <p style="font-size:13px;color:#aab;margin-bottom:12px;line-height:1.6;">Commits this file to <strong style="color:#e0e6f0;">zaiden-hash/rws-weather</strong> as <code style="color:var(--sky);">national.html</code>.</p>
+            <label class="amn-label" for="gh-tok-n">GitHub Personal Access Token</label>
+            <input class="amn-input-sm" type="password" id="gh-tok-n" placeholder="ghp_xxxx" autocomplete="off" style="margin-bottom:10px;"/>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;">
+              <button class="amn-btn" id="push-btn-n" style="margin-top:0;">&#x1F680; Push to GitHub</button>
+              <button class="amn-btn-sec" id="save-tok-n" style="margin-top:0;">Save Token</button>
+            </div>
+            <div class="amn-status" id="push-status-n"></div>
+            <div class="gh-note-n">Token needs <strong>repo</strong> scope. <a href="https://github.com/settings/tokens" target="_blank">github.com/settings/tokens</a><br>Note: Outlook graphics are stored in browser only (too large for GitHub). Text content pushes fine.</div>
+          </div>
+        </div>
+
+        <!-- SETTINGS TAB -->
+        <div class="amn-tab-panel" id="tabn-settings">
+          <div class="amn-section">
+            <div class="amn-section-title">Change Password</div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:8px;">
+              <div><label class="amn-label">New Password</label><input class="amn-input-sm" type="password" id="new-pwa-n" autocomplete="new-password"/></div>
+              <div><label class="amn-label">Confirm</label><input class="amn-input-sm" type="password" id="new-pwb-n" autocomplete="new-password"/></div>
+            </div>
+            <button class="amn-btn" id="change-pw-n" style="margin-top:0;">Update Password</button>
+            <div class="amn-status" id="pw-status-n"></div>
+          </div>
+          <div class="amn-section">
+            <div class="amn-section-title">Site Lock</div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:8px;">
+              <div><label class="amn-label">Lock PIN</label><input class="amn-input-sm" type="password" id="lk-pin-set-n" placeholder="Set PIN" maxlength="12"/></div>
+              <div><label class="amn-label">Confirm PIN</label><input class="amn-input-sm" type="password" id="lk-pin-conf-n" placeholder="Confirm" maxlength="12"/></div>
+            </div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;">
+              <button class="amn-btn" id="lock-site-n" style="background:#c8a000;margin-top:0;">&#x1F512; Lock Site</button>
+              <button class="amn-btn-sec" id="save-pin-n" style="margin-top:0;">Save PIN</button>
+              <button class="amn-btn-sec" id="logout-n" style="margin-top:0;">Log Out</button>
+            </div>
+            <div class="amn-status" id="lock-status-n"></div>
+          </div>
+        </div>
+
+      </div><!-- /editor-view -->
+    </div>
+  </div>
+</div>
+
+<script data-cfasync="false">
+// ════════════════════════════════════════════════════
+//  DATA STORE
+// ════════════════════════════════════════════════════
+/* NAT_DATA_START */
+const DEFAULT_NAT = {
+  offices: [
+    { name: "RWS Albany", url: "index.html" }
+  ],
+  cityOverrides: {},
+  discussion: "Day 1: No significant severe weather expected across the United States today.\n\nDay 2: Monitoring a developing system in the central plains.\n\nDay 3: No organized severe threat anticipated.",
+  banner: { enabled: false, text: "", color: "#cc0000" },
+  outlookCaptions: { "1": "", "2": "", "3": "" },
+  lastUpdated: ""
+};
+/* NAT_DATA_END */
+
+let NAT = JSON.parse(JSON.stringify(DEFAULT_NAT));
+try {
+  var _s = localStorage.getItem("rws_nat_data");
+  if (_s) { var _p = JSON.parse(_s); if (_p && Array.isArray(_p.offices)) NAT = _p; }
+} catch(e) {}
+
+// Outlook images stored separately (can be large base64)
+var OUTLOOK_IMGS = { "1": null, "2": null, "3": null };
+try {
+  var _oi = localStorage.getItem("rws_nat_imgs");
+  if (_oi) OUTLOOK_IMGS = Object.assign({ "1": null, "2": null, "3": null }, JSON.parse(_oi));
+} catch(e) {}
+
+var activeDay = 1;
+var bannerColN = (NAT.banner && NAT.banner.color) || "#cc0000";
+
+// ════════════════════════════════════════════════════
+//  CITIES
+// ════════════════════════════════════════════════════
+const CITIES_N = [
+  {name:"New York, NY",   lat:40.71, lon:-74.00, asos:"KNYC"},
+  {name:"Los Angeles, CA",lat:34.05, lon:-118.24,asos:"KLAX"},
+  {name:"Chicago, IL",    lat:41.88, lon:-87.63, asos:"KMDW"},
+  {name:"Houston, TX",    lat:29.76, lon:-95.37, asos:"KHOU"},
+  {name:"Phoenix, AZ",    lat:33.45, lon:-112.07,asos:"KPHX"},
+  {name:"Philadelphia, PA",lat:39.95,lon:-75.17, asos:"KPHL"},
+  {name:"San Antonio, TX",lat:29.42, lon:-98.49, asos:"KSAT"},
+  {name:"Dallas, TX",     lat:32.78, lon:-96.80, asos:"KDFW"},
+  {name:"San Diego, CA",  lat:32.72, lon:-117.15,asos:"KSAN"},
+  {name:"Seattle, WA",    lat:47.61, lon:-122.33,asos:"KSEA"},
+  {name:"Denver, CO",     lat:39.74, lon:-104.98,asos:"KDEN"},
+  {name:"Atlanta, GA",    lat:33.75, lon:-84.39, asos:"KATL"},
+  {name:"Miami, FL",      lat:25.78, lon:-80.21, asos:"KMIA"},
+  {name:"Minneapolis, MN",lat:44.98, lon:-93.27, asos:"KMSP"},
+  {name:"Kansas City, MO",lat:39.10, lon:-94.58, asos:"KMCI"},
+  {name:"St. Louis, MO",  lat:38.63, lon:-90.20, asos:"KSTL"},
+  {name:"Oklahoma City, OK",lat:35.47,lon:-97.52,asos:"KOKC"},
+  {name:"Nashville, TN",  lat:36.17, lon:-86.78, asos:"KBNA"},
+  {name:"Charlotte, NC",  lat:35.23, lon:-80.84, asos:"KCLT"},
+  {name:"Indianapolis, IN",lat:39.77,lon:-86.16, asos:"KIND"},
+  {name:"Columbus, OH",   lat:39.96, lon:-83.00, asos:"KCMH"},
+  {name:"Salt Lake City, UT",lat:40.76,lon:-111.89,asos:"KSLC"},
+  {name:"Omaha, NE",      lat:41.26, lon:-95.94, asos:"KOMA"},
+  {name:"Memphis, TN",    lat:35.15, lon:-90.05, asos:"KMEM"},
+  {name:"Las Vegas, NV",  lat:36.17, lon:-115.14,asos:"KLAS"},
+  {name:"Portland, OR",   lat:45.52, lon:-122.68,asos:"KPDX"},
+  {name:"Boston, MA",     lat:42.36, lon:-71.06, asos:"KBOS"},
+  {name:"Detroit, MI",    lat:42.33, lon:-83.05, asos:"KDTW"},
+  {name:"New Orleans, LA",lat:29.95, lon:-90.07, asos:"KMSY"},
+  {name:"Albany, NY",     lat:42.65, lon:-73.76, asos:"KALB"},
+];
+
+const RISK_COLORS_N = {TSTM:"#c8d896",MRGL:"#7ec850",SLGT:"#f0e050",ENH:"#e08028",MDT:"#e82010",HIGH:"#ff00ff"};
+
+// ════════════════════════════════════════════════════
+//  CLOCK
+// ════════════════════════════════════════════════════
+function tickN(){
+  var n=new Date(), p=function(x){return x.toString().padStart(2,"0");};
+  var l=p(n.getHours())+":"+p(n.getMinutes())+":"+p(n.getSeconds());
+  var u=p(n.getUTCHours())+":"+p(n.getUTCMinutes())+":"+p(n.getUTCSeconds())+" Z";
+  ["n-clock-local","n-clock-utc","lk-clock-n"].forEach(function(id,i){
+    var el=document.getElementById(id); if(el) el.textContent=i===1?u:l;
+  });
+  var ld=document.getElementById("lk-date-n");
+  if(ld) ld.textContent=n.toLocaleDateString("en-US",{weekday:"long",month:"long",day:"numeric"});
+}
+setInterval(tickN,1000); tickN();
+
+// ════════════════════════════════════════════════════
+//  LOCK
+// ════════════════════════════════════════════════════
+var DEF_PIN_N="8d969eef6ecad3c29a3a629280e686cf0c3f5d5a86aff3ca12020c923adc6c92"; // 123456
+async function pinHashN(s){ var b=await crypto.subtle.digest("SHA-256",new TextEncoder().encode(s)); return Array.from(new Uint8Array(b)).map(function(x){return x.toString(16).padStart(2,"0");}).join(""); }
+function getPinN(){ return localStorage.getItem("rws_nat_pin")||DEF_PIN_N; }
+
+(function(){
+  var ls=document.getElementById("lock-screen-n");
+  if(localStorage.getItem("rws_nat_locked")==="1") ls.classList.add("locked");
+  else ls.classList.remove("locked");
+})();
+
+window.tryUnlockN=async function(){
+  var inp=document.getElementById("lk-pin-n"), err=document.getElementById("lk-err-n");
+  var h=await pinHashN(inp.value);
+  if(h===getPinN()){ localStorage.removeItem("rws_nat_locked"); document.getElementById("lock-screen-n").classList.remove("locked"); inp.value=""; if(err) err.textContent=""; }
+  else{ if(err) err.textContent="Incorrect PIN. Try again."; inp.value=""; inp.focus(); }
+};
+document.getElementById("lk-pin-n").addEventListener("keydown",function(e){ if(e.key==="Enter") window.tryUnlockN(); });
+
+// ════════════════════════════════════════════════════
+//  THEME
+// ════════════════════════════════════════════════════
+var themeIdxN=0;
+(function(){ var t=localStorage.getItem("rws_nat_theme")||""; document.documentElement.setAttribute("data-theme",t); themeIdxN=t==="dark"?1:0; })();
+document.getElementById("theme-btn-n").onclick=function(){ themeIdxN=(themeIdxN+1)%2; var t=themeIdxN===1?"dark":""; document.documentElement.setAttribute("data-theme",t); localStorage.setItem("rws_nat_theme",t); };
+
+// ════════════════════════════════════════════════════
+//  BANNER
+// ════════════════════════════════════════════════════
+function applyBannerN(){
+  var b=NAT.banner, el=document.getElementById("site-banner-n"), tx=document.getElementById("banner-text-n");
+  if(!el) return;
+  if(b&&b.enabled&&b.text){ el.style.background=b.color||"#cc0000"; el.style.color="white"; if(tx) tx.textContent=b.text; el.classList.add("show"); }
+  else el.classList.remove("show");
+}
+if(document.readyState==="loading"){ document.addEventListener("DOMContentLoaded",applyBannerN); } else { applyBannerN(); }
+
+// ════════════════════════════════════════════════════
+//  OFFICES
+// ════════════════════════════════════════════════════
+function renderOffices(){
+  // Footer
+  var fl=document.getElementById("footer-office-links");
+  if(fl) fl.innerHTML=(NAT.offices||[]).map(function(o){ return '<a href="'+o.url+'" '+(o.url===window.location.pathname.split('/').pop()||o.url==="national.html"?'style="color:rgba(255,255,255,0.85)"':'')+'>'+o.name+'</a>'; }).join("");
+  // Header nav
+  var hn=document.getElementById("header-office-nav");
+  if(hn) hn.innerHTML=(NAT.offices||[]).map(function(o){ var isActive=o.url==="national.html"||o.url===window.location.href; return '<a href="'+o.url+'"'+(isActive?' class="active-link"':'')+'>'+o.name+'</a>'; }).join("")+'<a href="national.html" class="active-link">Nat. Outlook</a>';
+}
+renderOffices();
+
+function renderOfficeList(){
+  var el=document.getElementById("office-list"); if(!el) return;
+  if(!NAT.offices||!NAT.offices.length){ el.innerHTML='<div style="font-size:12px;color:#556677;padding:6px 0;">No offices added yet.</div>'; return; }
+  el.innerHTML=(NAT.offices||[]).map(function(o,i){
+    return '<div class="office-item"><span class="oi-name">'+o.name+'</span><span class="oi-url">'+o.url+'</span><button class="office-del-btn" onclick="deleteOffice('+i+')">&#x2715;</button></div>';
+  }).join("");
+}
+window.deleteOffice=function(i){ NAT.offices.splice(i,1); saveNat(); renderOffices(); renderOfficeList(); };
+
+// ════════════════════════════════════════════════════
+//  OUTLOOK GRAPHIC
+// ════════════════════════════════════════════════════
+function showOutlookForDay(day){
+  var img=document.getElementById("outlook-graphic");
+  var empty=document.getElementById("outlook-empty");
+  var cap=document.getElementById("outlook-caption");
+  var meta=document.getElementById("outlook-card-meta");
+  var src=OUTLOOK_IMGS[String(day)];
+  if(src){
+    img.src=src; img.style.display="block";
+    if(empty) empty.style.display="none";
+  } else {
+    img.src=""; img.style.display="none";
+    if(empty) empty.style.display="flex";
+  }
+  var c=(NAT.outlookCaptions&&NAT.outlookCaptions[String(day)])||"";
+  if(cap) cap.textContent=c;
+  if(meta) meta.textContent=c?"Graphic: "+c:"Upload graphic from admin panel";
+  var ru=document.getElementById("risk-updated-n");
+  if(ru) ru.textContent=NAT.lastUpdated?"Updated: "+NAT.lastUpdated:"";
+}
+showOutlookForDay(1);
+
+// ════════════════════════════════════════════════════
+//  CITY RISK LIST
+// ════════════════════════════════════════════════════
+function renderCityRiskList(){
+  var el=document.getElementById("city-risk-list-n"); if(!el) return;
+  el.innerHTML=CITIES_N.map(function(city){
+    var risk=(NAT.cityOverrides&&NAT.cityOverrides[city.name])||"";
+    var col=RISK_COLORS_N[risk]||"#4488cc";
+    var badge=risk?'<span class="crd-badge" style="background:'+col+';color:'+(risk==="SLGT"?"#333":"white")+'">'+risk+'</span>':"";
+    return '<div class="city-risk-row"><div class="crd-dot" style="background:'+(risk?col:"rgba(68,136,204,0.5)")+';"></div><span class="crd-name">'+city.name+'</span>'+badge+'</div>';
+  }).join("");
+}
+renderCityRiskList();
+
+// ════════════════════════════════════════════════════
+//  CURRENT CONDITIONS (live ASOS)
+// ════════════════════════════════════════════════════
+function tempColor(f){ if(f===null) return "#888"; if(f>=90) return "#cc2200"; if(f>=80) return "#e65c00"; if(f>=70) return "#c8a000"; if(f>=60) return "#3a9a20"; if(f>=50) return "#1a8a7a"; if(f>=40) return "#1e6ab0"; if(f>=32) return "#1a4fb0"; return "#6a00cc"; }
+function degToDir(d){ return ["N","NNE","NE","ENE","E","ESE","SE","SSE","S","SSW","SW","WSW","W","WNW","NW","NNW"][Math.round(d/22.5)%16]; }
+
+async function fetchNatConditions(){
+  var grid=document.getElementById("nat-cond-grid"); if(!grid) return;
+  grid.innerHTML=CITIES_N.map(function(c){ return '<div class="cond-item"><div class="cond-station">'+c.name+'</div><div class="cond-temp cond-loading">--°</div><div class="cond-wx cond-loading">Loading…</div></div>'; }).join("");
+  await Promise.all(CITIES_N.map(async function(city,idx){
+    try{
+      var r=await fetch("https://api.weather.gov/stations/"+city.asos+"/observations/latest",{headers:{"User-Agent":"RWSWeather/1.0 rwsofficeman@gmail.com"}});
+      if(!r.ok) throw new Error(r.status);
+      var d=await r.json(); var p=d.properties;
+      var tC=p.temperature&&p.temperature.value;
+      var tF=tC!=null?Math.round(tC*9/5+32):null;
+      var wx=p.textDescription||"—";
+      var wind=p.windSpeed&&p.windSpeed.value!=null?Math.round(p.windSpeed.value*0.621371)+" mph "+(p.windDirection&&p.windDirection.value!=null?degToDir(p.windDirection.value):""):"Calm";
+      var hum=p.relativeHumidity&&p.relativeHumidity.value!=null?Math.round(p.relativeHumidity.value)+"%":"—";
+      var pres=p.seaLevelPressure&&p.seaLevelPressure.value!=null?(p.seaLevelPressure.value/33.8639).toFixed(2)+'"':"—";
+      var time=p.timestamp?new Date(p.timestamp).toLocaleTimeString("en-US",{hour:"2-digit",minute:"2-digit"}):"—";
+      var col=tempColor(tF);
+      var cards=grid.querySelectorAll(".cond-item");
+      if(cards[idx]) cards[idx].innerHTML='<div class="cond-station">'+city.name+'</div><div class="cond-temp" style="color:'+col+'">'+(tF!=null?tF:"—")+'<span class="cond-unit">°F</span></div><div class="cond-wx">'+wx+'</div><div class="cond-meta">&#x1F32C; '+wind+'&nbsp;&#x1F4A7; '+hum+'<br>&#x1F4CF; '+pres+'&nbsp;<span style="color:#bbb;">'+time+'</span></div>';
+    }catch(e){ var cards=grid.querySelectorAll(".cond-item"); if(cards[idx]) cards[idx].innerHTML='<div class="cond-station">'+city.name+'</div><div style="font-size:11px;color:#cc5050;font-family:\'Barlow Condensed\',sans-serif;text-transform:uppercase;letter-spacing:0.06em;margin-top:4px;">Unavailable</div>'; }
+  }));
+}
+fetchNatConditions();
+setInterval(fetchNatConditions, 10*60*1000);
+
+// ════════════════════════════════════════════════════
+//  DISCUSSION
+// ════════════════════════════════════════════════════
+function renderDiscN(){
+  var el=document.getElementById("nat-disc-body"); if(!el) return;
+  var paras=NAT.discussion.split(/\n\n+/);
+  el.innerHTML=paras.map(function(p){ if(!p.trim()) return ""; return '<p>'+p.trim().replace(/^(Day \d+:|SHORT TERM|LONG TERM)(\s*:?)/,'<strong>$&</strong>')+'</p>'; }).join("");
+  var du=document.getElementById("n-disc-updated"); if(du&&NAT.lastUpdated) du.textContent=NAT.lastUpdated;
+}
+renderDiscN();
+
+// ════════════════════════════════════════════════════
+//  NWS ALERTS
+// ════════════════════════════════════════════════════
+async function fetchNatAlertsN(){
+  var areas=["NY","CA","TX","FL","IL","WA","CO","GA","MN","MO","OK","TN","NC","IN","OH","NE","PA","MA","MI","LA"];
+  var all=[];
+  try{
+    var results=await Promise.all(areas.map(async function(a){
+      try{ var r=await fetch("https://api.weather.gov/alerts/active?area="+a,{headers:{"User-Agent":"RWSWeather/1.0 rwsofficeman@gmail.com"}}); if(!r.ok) return []; var d=await r.json(); return d.features||[]; }catch(e){return [];}
+    }));
+    var seen={}; results.forEach(function(arr){ arr.forEach(function(f){ var id=f.properties&&f.properties.id; if(!seen[id]){seen[id]=true;all.push(f);} }); });
+  }catch(e){}
+
+  renderAlertsN(all.filter(function(f){ var ev=(f.properties&&f.properties.event)||""; return ev.includes("Warning")||ev.includes("Watch"); }));
+  renderTickerN(all.filter(function(f){ var s=(f.properties&&f.properties.severity)||""; return s==="Extreme"||s==="Severe"; }));
+}
+
+var SEV_C_N={"Tornado Warning":"#f00","Severe Thunderstorm Warning":"#ff6600","Tornado Watch":"#ffcc00","Severe Thunderstorm Watch":"#80ff80"};
+
+function renderAlertsN(alerts){
+  var el=document.getElementById("active-warn-list-n"); if(!el) return;
+  var cnt=document.getElementById("warn-count-n"); if(cnt) cnt.textContent=alerts.length+" active";
+  if(!alerts.length){ el.innerHTML='<div class="no-msg">No active warnings</div>'; return; }
+  var sorted=alerts.slice().sort(function(a,b){
+    var o=["Tornado Warning","Severe Thunderstorm Warning","Tornado Watch","Severe Thunderstorm Watch"];
+    return (o.indexOf((a.properties&&a.properties.event)||"")||99)-(o.indexOf((b.properties&&b.properties.event)||"")||99);
+  });
+  el.innerHTML=sorted.slice(0,14).map(function(f){
+    var p=f.properties||{}, ev=p.event||"Alert", col=SEV_C_N[ev]||"#aaa";
+    return '<div class="alert-item" style="border-left-color:'+col+'"><div class="ai-type" style="color:'+col+'">'+ev+'</div><div class="ai-area">'+((p.areaDesc||"").split(";")[0])+'</div></div>';
+  }).join("")+(sorted.length>14?'<div class="no-msg">+'+(sorted.length-14)+' more</div>':"");
+}
+
+function renderTickerN(alerts){
+  var el=document.getElementById("ticker-inner-n"), tick=document.getElementById("alert-ticker");
+  if(!el||!tick) return;
+  if(!alerts.length){ tick.classList.remove("has-alerts"); return; }
+  tick.classList.add("has-alerts");
+  var html=alerts.map(function(f){ var p=f.properties||{}; return '<span class="ticker-item"><span class="ti-type">'+p.event+'</span>'+((p.headline||"").substring(0,80))+'<span style="color:rgba(255,255,255,0.3)"> &bull; </span></span>'; }).join("");
+  el.innerHTML=html+html;
+}
+
+fetchNatAlertsN();
+setInterval(fetchNatAlertsN, 10*60*1000);
+
+// ════════════════════════════════════════════════════
+//  DAY SELECTOR
+// ════════════════════════════════════════════════════
+document.querySelectorAll(".day-btn").forEach(function(btn){
+  btn.onclick=function(){
+    document.querySelectorAll(".day-btn").forEach(function(b){b.classList.remove("active");});
+    btn.classList.add("active");
+    activeDay=+btn.dataset.outday;
+    var t=document.getElementById("outlook-card-title"); if(t) t.textContent="Day "+activeDay+" Convective Outlook";
+    showOutlookForDay(activeDay);
+    renderCityRiskList();
+  };
+});
+
+// ════════════════════════════════════════════════════
+//  SAVE
+// ════════════════════════════════════════════════════
+function saveNat(){
+  NAT.lastUpdated=new Date().toLocaleString("en-US",{month:"short",day:"numeric",year:"numeric",hour:"2-digit",minute:"2-digit",timeZoneName:"short"});
+  try{ localStorage.setItem("rws_nat_data",JSON.stringify(NAT)); }catch(e){}
+}
+function saveImgs(){
+  try{ localStorage.setItem("rws_nat_imgs",JSON.stringify(OUTLOOK_IMGS)); }catch(e){ console.warn("Imgs too large for localStorage"); }
+}
+
+// ════════════════════════════════════════════════════
+//  ADMIN
+// ════════════════════════════════════════════════════
+async function sha256n(s){ var b=await crypto.subtle.digest("SHA-256",new TextEncoder().encode(s)); return Array.from(new Uint8Array(b)).map(function(x){return x.toString(16).padStart(2,"0");}).join(""); }
+var DEF_HASH_N="1e4462d180b4afeb27c265227d6db977067939d78c346c576c3acb3fc0609161"; // RWSforecaster
+function getHashN(){ return localStorage.getItem("rws_nat_hash")||DEF_HASH_N; }
+
+document.getElementById("admin-btn-n").onclick=function(){ document.getElementById("admin-overlay-n").classList.add("open"); setTimeout(function(){document.getElementById("pw-n").focus();},50); };
+document.getElementById("amn-close").onclick=closeAdminN;
+document.getElementById("admin-overlay-n").onclick=function(e){ if(e.target===e.currentTarget) closeAdminN(); };
+document.addEventListener("keydown",function(e){ if(e.key==="Escape") closeAdminN(); });
+function closeAdminN(){ document.getElementById("admin-overlay-n").classList.remove("open"); }
+
+document.getElementById("login-btn-n").onclick=doLoginN;
+document.getElementById("pw-n").addEventListener("keydown",function(e){ if(e.key==="Enter") doLoginN(); });
+
+async function doLoginN(){
+  var h=await sha256n(document.getElementById("pw-n").value);
+  if(h===getHashN()){
+    document.getElementById("login-view-n").style.display="none";
+    document.getElementById("editor-view-n").style.display="block";
+    document.getElementById("login-err-n").style.display="none";
+    document.getElementById("pw-n").value="";
+    buildAdminN();
+  } else {
+    document.getElementById("login-err-n").style.display="block";
+    document.getElementById("pw-n").select();
+  }
+}
+
+// Tabs
+document.querySelectorAll(".amn-tab").forEach(function(tab){
+  tab.onclick=function(){
+    document.querySelectorAll(".amn-tab").forEach(function(t){t.classList.remove("active");});
+    document.querySelectorAll(".amn-tab-panel").forEach(function(p){p.classList.remove("active");});
+    tab.classList.add("active");
+    document.getElementById("tabn-"+tab.dataset.tabn).classList.add("active");
+  };
+});
+
+function buildAdminN(){
+  buildDaySlots();
+  buildCitiesAdmin();
+  renderOfficeList();
+  // Pre-fill
+  var di=document.getElementById("nat-disc-input"); if(di) di.value=NAT.discussion||"";
+  var bm=document.getElementById("banner-msg-n"); if(bm) bm.value=(NAT.banner&&NAT.banner.text)||"";
+  var be=document.getElementById("banner-en-n"); if(be) be.checked=!!(NAT.banner&&NAT.banner.enabled);
+  var gt=document.getElementById("gh-tok-n"); if(gt) gt.value=localStorage.getItem("rws_nat_token")||"";
+}
+
+// ── Day image slots ──
+function buildDaySlots(){
+  var el=document.getElementById("day-img-slots"); if(!el) return;
+  el.innerHTML=[1,2,3].map(function(d){
+    var has=!!OUTLOOK_IMGS[String(d)];
+    return '<div class="day-img-slot" id="day-slot-'+d+'">'
+      +'<span class="dis-label">Day '+d+'</span>'
+      +(has?'<img src="'+OUTLOOK_IMGS[String(d)]+'" id="day-slot-img-'+d+'"/>':'')
+      +'<div class="dis-status" id="day-slot-status-'+d+'">'+(has?"&#x2705; Loaded":"No image")+'</div>'
+      +(has?'<button class="dis-clear" id="day-slot-clear-'+d+'" onclick="clearDayImg('+d+')" style="display:block;">&#x2715; Remove</button>':'')
+      +'</div>';
+  }).join("");
+}
+
+window.clearDayImg=function(d){
+  OUTLOOK_IMGS[String(d)]=null;
+  if(d===activeDay) showOutlookForDay(d);
+  saveImgs();
+  buildDaySlots();
+  setStatusN("gfc-status","Day "+d+" image cleared.","ok");
+};
+
+// ── GFC / image upload ──
+document.getElementById("gfc-upload").onchange=function(e){
+  var file=e.target.files[0]; if(!file) return;
+  var day=+(document.getElementById("gfc-day-select")||{}).value||1;
+  if(file.size>8*1024*1024){ setStatusN("gfc-status","Image too large (max 8MB)","err"); return; }
+  var reader=new FileReader();
+  reader.onload=function(ev){
+    OUTLOOK_IMGS[String(day)]=ev.target.result;
+    var cap=(document.getElementById("gfc-caption")||{}).value||"";
+    if(!NAT.outlookCaptions) NAT.outlookCaptions={};
+    NAT.outlookCaptions[String(day)]=cap;
+    saveNat(); saveImgs();
+    if(day===activeDay) showOutlookForDay(day);
+    buildDaySlots();
+    setStatusN("gfc-status","\u2705 Day "+day+" graphic loaded: "+file.name,"ok");
+  };
+  reader.readAsDataURL(file);
+  e.target.value="";
+};
+
+// Drop support
+var dz=document.getElementById("gfc-drop-zone");
+if(dz){
+  dz.addEventListener("dragover",function(e){e.preventDefault();dz.style.borderColor="#5b9bd5";});
+  dz.addEventListener("dragleave",function(){dz.style.borderColor="#3a4060";});
+  dz.addEventListener("drop",function(e){
+    e.preventDefault(); dz.style.borderColor="#3a4060";
+    var file=e.dataTransfer.files[0]; if(!file) return;
+    var day=+(document.getElementById("gfc-day-select")||{}).value||1;
+    if(file.size>8*1024*1024){ setStatusN("gfc-status","Image too large (max 8MB)","err"); return; }
+    var reader=new FileReader();
+    reader.onload=function(ev){
+      OUTLOOK_IMGS[String(day)]=ev.target.result;
+      var cap=(document.getElementById("gfc-caption")||{}).value||"";
+      if(!NAT.outlookCaptions) NAT.outlookCaptions={};
+      NAT.outlookCaptions[String(day)]=cap;
+      saveNat(); saveImgs();
+      if(day===activeDay) showOutlookForDay(day);
+      buildDaySlots();
+      setStatusN("gfc-status","\u2705 Day "+day+" graphic loaded: "+file.name,"ok");
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+// ── Cities admin ──
+function buildCitiesAdmin(){
+  var sel=document.getElementById("city-sel-n"); if(!sel) return;
+  sel.innerHTML=CITIES_N.map(function(c){return '<option value="'+c.name+'">'+c.name+'</option>';}).join("");
+  renderCityOverrideTable();
+}
+function renderCityOverrideTable(){
+  var el=document.getElementById("city-override-table"); if(!el) return;
+  var entries=Object.entries(NAT.cityOverrides||{});
+  if(!entries.length){ el.innerHTML='<div style="font-size:12px;color:#556677;padding:6px 0;">No overrides set.</div>'; return; }
+  el.innerHTML='<table class="risk-table-n"><tr><th>City</th><th>Risk</th><th></th></tr>'
+    +entries.map(function(e){ var col=RISK_COLORS_N[e[1]]||"#aaa"; return '<tr><td>'+e[0]+'</td><td><span style="color:'+col+';font-weight:700;">'+e[1]+'</span></td><td><button class="rt-del" onclick="removeCityOverride(\''+e[0]+'\')">&#x2715;</button></td></tr>'; }).join("")+'</table>';
+}
+window.removeCityOverride=function(name){ delete NAT.cityOverrides[name]; saveNat(); renderCityRiskList(); renderCityOverrideTable(); };
+
+document.getElementById("set-city-risk-n").onclick=function(){
+  var city=(document.getElementById("city-sel-n")||{}).value;
+  var risk=(document.getElementById("city-risk-n")||{}).value;
+  if(!city) return;
+  if(!NAT.cityOverrides) NAT.cityOverrides={};
+  if(risk) NAT.cityOverrides[city]=risk; else delete NAT.cityOverrides[city];
+  saveNat(); renderCityRiskList(); renderCityOverrideTable();
+};
+document.getElementById("clear-city-n").onclick=function(){ NAT.cityOverrides={}; saveNat(); renderCityRiskList(); renderCityOverrideTable(); };
+
+// ── Offices admin ──
+document.getElementById("add-office-btn").onclick=function(){
+  var name=(document.getElementById("office-name")||{}).value.trim();
+  var url=(document.getElementById("office-url")||{}).value.trim();
+  if(!name||!url){ setStatusN("office-status","Enter both name and URL.","err"); return; }
+  if(!NAT.offices) NAT.offices=[];
+  NAT.offices.push({name:name,url:url});
+  document.getElementById("office-name").value="";
+  document.getElementById("office-url").value="";
+  saveNat(); renderOffices(); renderOfficeList();
+  setStatusN("office-status","\u2705 Office added.","ok");
+};
+
+// ── Banner admin ──
+document.querySelectorAll(".bsw-n").forEach(function(sw){
+  sw.onclick=function(){ bannerColN=sw.dataset.col; document.querySelectorAll(".bsw-n").forEach(function(s){s.classList.toggle("sel",s===sw);}); };
+});
+document.getElementById("save-banner-n").onclick=function(){
+  if(!NAT.banner) NAT.banner={};
+  NAT.banner.text=(document.getElementById("banner-msg-n")||{}).value||"";
+  NAT.banner.enabled=!!((document.getElementById("banner-en-n")||{}).checked);
+  NAT.banner.color=bannerColN;
+  saveNat(); applyBannerN();
+  flashN("banner-status-n","\u2705 Banner applied.");
+};
+
+// ── Discussion admin ──
+document.getElementById("save-disc-n").onclick=function(){
+  NAT.discussion=(document.getElementById("nat-disc-input")||{}).value||"";
+  saveNat(); renderDiscN(); flashN("disc-status-n","\u2705 Saved.");
+};
+
+// ── GitHub push ──
+document.getElementById("save-tok-n").onclick=function(){ localStorage.setItem("rws_nat_token",(document.getElementById("gh-tok-n")||{}).value||""); flashN("push-status-n","Token saved."); };
+document.getElementById("push-btn-n").onclick=pushNatGH;
+
+async function pushNatGH(){
+  var token=(document.getElementById("gh-tok-n")||{}).value.trim();
+  if(!token){ setStatusN("push-status-n","Enter a GitHub token.","err"); return; }
+  var btn=document.getElementById("push-btn-n"); btn.disabled=true;
+  setStatusN("push-status-n","Fetching current file\u2026","loading");
+  var API="https://api.github.com/repos/zaiden-hash/rws-weather/contents/national.html";
+  var H={"Authorization":"Bearer "+token,"Accept":"application/vnd.github+json","Content-Type":"application/json"};
+  try{
+    var gr=await fetch(API,{headers:H}); if(!gr.ok) throw new Error("GitHub: "+gr.status);
+    var gi=await gr.json();
+    var html=decodeURIComponent(escape(atob(gi.content.replace(/\n/g,""))));
+    // Only push text data (not images — too large)
+    var pushData=Object.assign({},NAT); // images stay in browser only
+    var nb="/* NAT_DATA_START */\nconst DEFAULT_NAT = "+JSON.stringify(pushData,null,2)+";\n/* NAT_DATA_END */";
+    var upd=html.replace(/\/\* NAT_DATA_START \*\/[\s\S]*?\/\* NAT_DATA_END \*\//,nb);
+    if(upd===html) throw new Error("Data block not found.");
+    setStatusN("push-status-n","Pushing\u2026","loading");
+    var pr=await fetch(API,{method:"PUT",headers:H,body:JSON.stringify({message:"National outlook update \u2014 "+new Date().toLocaleString(),content:btoa(unescape(encodeURIComponent(upd))),sha:gi.sha})});
+    if(!pr.ok){ var e2=await pr.json(); throw new Error(e2.message||pr.status); }
+    setStatusN("push-status-n","\u2705 Pushed! Pages update in ~1 min. (Note: graphics stay in browser only)","ok");
+    localStorage.setItem("rws_nat_token",token);
+  }catch(e){ setStatusN("push-status-n","\u274C "+e.message,"err"); }
+  btn.disabled=false;
+}
+
+// ── Settings ──
+document.getElementById("change-pw-n").onclick=async function(){
+  var p1=(document.getElementById("new-pwa-n")||{}).value;
+  var p2=(document.getElementById("new-pwb-n")||{}).value;
+  if(!p1){ setStatusN("pw-status-n","Enter a password.","err"); return; }
+  if(p1!==p2){ setStatusN("pw-status-n","Passwords don\u2019t match.","err"); return; }
+  if(p1.length<6){ setStatusN("pw-status-n","Min 6 characters.","err"); return; }
+  localStorage.setItem("rws_nat_hash",await sha256n(p1));
+  document.getElementById("new-pwa-n").value=""; document.getElementById("new-pwb-n").value="";
+  setStatusN("pw-status-n","\u2705 Password updated.","ok");
+};
+
+document.getElementById("save-pin-n").onclick=async function(){
+  var p1=(document.getElementById("lk-pin-set-n")||{}).value;
+  var p2=(document.getElementById("lk-pin-conf-n")||{}).value;
+  if(!p1){ setStatusN("lock-status-n","Enter a PIN.","err"); return; }
+  if(p1!==p2){ setStatusN("lock-status-n","PINs don\u2019t match.","err"); return; }
+  localStorage.setItem("rws_nat_pin",await pinHashN(p1));
+  document.getElementById("lk-pin-set-n").value=""; document.getElementById("lk-pin-conf-n").value="";
+  setStatusN("lock-status-n","\u2705 PIN saved.","ok");
+};
+
+document.getElementById("lock-site-n").onclick=function(){ localStorage.setItem("rws_nat_locked","1"); document.getElementById("lock-screen-n").classList.add("locked"); closeAdminN(); };
+document.getElementById("logout-n").onclick=function(){ document.getElementById("editor-view-n").style.display="none"; document.getElementById("login-view-n").style.display="block"; closeAdminN(); };
+
+// ── Utils ──
+function setStatusN(id,msg,type){ var el=document.getElementById(id); if(el){el.innerHTML=msg;el.className="amn-status "+(type||"");} }
+function flashN(id,msg){ setStatusN(id,msg,"ok"); setTimeout(function(){setStatusN(id,"","");},3000); }
+</script>
+</body>
+</html>
